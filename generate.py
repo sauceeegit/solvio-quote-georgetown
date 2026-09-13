@@ -5,11 +5,13 @@ import io, os
 OUT = r"C:\Users\chady\AppData\Local\Temp\claude\C--Users-chady-OneDrive-Desktop-Claude-Code-stuff-Hotel-map\02b0fb74-a5d9-48ed-a4e8-394c55479b62\scratchpad\quote-georgetown"
 
 # ---------------- inputs (bill + PVGIS model) ----------------
-PRICE        = 3850000        # PLACEHOLDER (G$) - system, installed, grid-tied
+PRICE        = 3850000        # PLACEHOLDER (G$) - Option A, 34 panels, installed, grid-tied
+PRICE_B      = 4400000        # PLACEHOLDER (G$) - Option B, 39 panels, installed, grid-tied
 BAT10        = 1350000        # PLACEHOLDER (G$) - +10 kWh battery incl. hybrid inverter
 BAT15        = 1900000        # PLACEHOLDER (G$) - +15 kWh battery incl. hybrid inverter
 FX           = 208.50         # G$ per US$, GRA published rate effective 1 Sep 2026
 PANELS       = 34
+PANELS_B     = 39
 PANEL_W      = 450
 KWP          = PANELS * PANEL_W / 1000.0          # 15.3
 YIELD_PER_KWP = 1524.79       # PVGIS Georgetown, 10 deg tilt, 14% losses
@@ -22,6 +24,10 @@ RATE         = 56.38          # G$/kWh, Tariff B
 FIXED_MO     = 2467           # G$/month, unaffected by solar
 OFFSET_YR    = int(round(min(GEN_YR, CONS_YR) * RATE / 1000.0)) * 1000   # capped at consumption
 MARGIN_PCT   = (GEN_YR / float(CONS_YR) - 1) * 100
+KWP_B        = PANELS_B * PANEL_W / 1000.0        # 17.55
+GEN_YR_B     = int(round(KWP_B * YIELD_PER_KWP))  # 26,760
+GEN_MO_B     = int(round(GEN_YR_B / 12.0))        # 2,230
+SURPLUS_B    = GEN_YR_B - CONS_YR                 # ~3,944 kWh/yr banked as credits
 
 def kwh_for(n): return int(round(n * PANEL_W / 1000.0 * YIELD_PER_KWP))
 
@@ -74,10 +80,11 @@ FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
 def chart_svg():
     rows = [("This bill (12 May - 11 Jun)", BILL_KWH, "rgba(9,50,27,.22)", "#09321B"),
             ("Your 3-month average", int(round(AVG3_KWH)), "rgba(9,50,27,.35)", "#09321B"),
-            ("%d panels - modeled monthly output" % PANELS, GEN_MO, "#FF6700", "#FF6700")]
-    W, H = 720, 190
+            ("Option A - %d panels, monthly output" % PANELS, GEN_MO, "#FF6700", "#FF6700"),
+            ("Option B - %d panels, monthly output" % PANELS_B, GEN_MO_B, "#C29848", "#A3550F")]
+    W, H = 720, 242
     lx, x0, x1 = 16, 250, 690
-    vmax = 2200.0
+    vmax = 2500.0
     s = []
     for i, (label, v, fill, tcol) in enumerate(rows):
         y = 22 + i * 52
@@ -130,21 +137,64 @@ def badge(v, lbl):
             '<span style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:17px;color:var(--gold)">%s</span>'
             '<span style="font-size:13px;color:var(--text-body)">%s</span></div>' % (v, lbl))
 
-def sens_rows():
-    rows = [(34, "Matches your annual consumption (+%.1f%%)" % MARGIN_PCT, True),
-            (35, "Matches this bill's month in a low-sun period", False),
-            (36, "About 8% headroom - only if 12 months of bills show higher demand", False),
-            (39, "Covers 1,901 kWh even in a low-sun month - likely over-produces annually", False)]
-    return "".join('<tr%s><td>%d panels</td><td>%.2f kWp</td><td>%s kWh/yr</td><td>%s</td></tr>'
-                   % (' class="hi"' if hi else "", n, n * PANEL_W / 1000.0, format(kwh_for(n), ","), note)
-                   for n, note, hi in rows)
-
-CHECKLIST = [
-    "%d &times; %d Wp Solvio all-black panels (%.1f kWp DC)" % (PANELS, PANEL_W, KWP),
-    "~15 kW AC grid-tied inverter &mdash; hybrid inverter if a battery is chosen; string design finalised at site survey",
+def checklist(n, kwp, inv):
+  return [
+    "%d &times; %d Wp Solvio all-black panels (%.2f kWp DC)" % (n, PANEL_W, kwp),
+    "~%s kW AC grid-tied inverter &mdash; hybrid inverter if a battery is chosen; string design finalised at site survey" % inv,
     "Low-tilt roof mounting engineered to your roof type &mdash; confirmed at survey",
     "GPL net-billing interconnection &mdash; we prepare the GPL request and GEI inspection",
     "Wiring, commissioning &amp; production monitoring",
+  ]
+
+def option_card(o):
+    checks = "".join('<li><span>&#10003;</span><span>%s</span></li>' % c for c in o["checks"])
+    stats = stat("~%sk kWh" % ("%.1f" % (o["gen"] / 1000.0)), "modeled yield / year") + \
+            stat("~" + gfmt(OFFSET_YR), "energy charges offset / year", "var(--price-green)")
+    chip = ('<span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--orange);border-radius:999px;padding:6px 13px">%s</span>' % o["chip"]
+            if o["solid"] else
+            '<span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-body);border:1px solid var(--border-soft);border-radius:999px;padding:5px 12px">%s</span>' % o["chip"])
+    note = ('<p style="font-size:12.5px;color:var(--text-body);margin:0 0 22px;line-height:1.5">%s</p>' % o["note"]) if o["note"] else ""
+    return """
+    <div class="card" style="padding:clamp(24px,4vw,36px);display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span class="mono" style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-muted)">%(label)s</span>
+        %(chip)s
+      </div>
+      <h2 style="font-weight:700;font-size:30px;margin:0 0 6px">%(kwp)s kWp system <span style="display:block;margin-top:8px"><span class="mono" style="display:inline-block;background:var(--orange);color:#fff;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-radius:.5rem;padding:5px 12px">%(n)d Panels</span></span></h2>
+      <p style="margin:0 0 22px;font-size:15px;color:var(--text-body)">%(desc)s</p>
+      <ul class="check" style="list-style:none;margin:0 0 24px;padding:0;display:grid;gap:11px;font-size:15px;color:var(--text-body)">
+        %(checks)s
+      </ul>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);padding:16px 0;margin-bottom:%(stats_mb)s">
+        %(stats)s
+      </div>%(note)s
+      <div class="mono" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2"></rect><line x1="22" y1="11" x2="22" y2="13"></line><line x1="6" y1="11" x2="6" y2="13"></line><line x1="10" y1="11" x2="10" y2="13"></line></svg>Add battery storage
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="batbtn sel" data-card="%(key)s" data-k="none" onclick="pick('%(key)s','none')"><b>None</b><i>grid-tied only</i></button>
+        <button class="batbtn" data-card="%(key)s" data-k="b10" onclick="pick('%(key)s','b10')"><b>+10 kWh</b><i>+%(bat10)s</i></button>
+        <button class="batbtn" data-card="%(key)s" data-k="b15" onclick="pick('%(key)s','b15')"><b>+15 kWh</b><i>+%(bat15)s</i></button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 24px;line-height:1.5">Battery options include a hybrid inverter in place of the grid-tied unit. Keeps essential loads running through outages and shifts daytime surplus into the evening.</p>
+      <div style="margin-top:auto">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Total, installed</div>
+        <div id="total-%(key)s" style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:38px;letter-spacing:-.02em;color:var(--price-green)">%(price)s</div>
+        <div style="font-size:14px;color:var(--ink);font-weight:600;margin-top:2px">&asymp; <span id="total-usd-%(key)s">%(price_usd)s</span> <span style="font-size:11.5px;color:var(--text-muted);font-weight:400">at G$%(fx)s / US$ (GRA rate, 1 Sep 2026)</span></div>
+        <div id="totalsub-%(key)s" style="font-size:12px;color:var(--text-muted);margin-top:4px">grid-tied, no battery &middot; preliminary, confirmed after site survey</div>
+      </div>
+    </div>""" % dict(o, checks=checks, stats=stats, chip=chip, note=note,
+                     bat10=gfmt(BAT10), bat15=gfmt(BAT15), price=gfmt(o["price"]), price_usd=usd(o["price"]),
+                     fx=("%.2f" % FX), stats_mb=("10px" if o["note"] else "22px"))
+
+OPTIONS = [
+    dict(key="a", label="Option A", chip="Annual match", solid=True, n=PANELS, kwp="%.1f" % KWP, gen=GEN_YR,
+         desc="Modeled to produce what you use over a year &mdash; %s kWh against %s kWh consumed." % (format(GEN_YR, ","), format(CONS_YR, ",")),
+         checks=checklist(PANELS, KWP, "15"), price=PRICE, note=""),
+    dict(key="b", label="Option B", chip="Wet-season cover", solid=False, n=PANELS_B, kwp="%.2f" % KWP_B, gen=GEN_YR_B,
+         desc="Covers your %s kWh average even in a June-like low-sun month &mdash; no need to draw on banked credits." % format(int(round(AVG3_KWH)), ","),
+         checks=checklist(PANELS_B, KWP_B, "17"), price=PRICE_B,
+         note="Plus ~%s kWh a year of surplus into your GPL Energy Credits Bank &mdash; paid at 90%% of tariff if unused after 12 months. Not counted in the figure above." % format(SURPLUS_B, ",")),
 ]
 NEXT_STEPS = [
     "Twelve consecutive GPL bills, to confirm the seasonal pattern",
@@ -189,37 +239,12 @@ HTML = """<!DOCTYPE html>
 
 <section class="wrap" style="padding-top:40px">
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:stretch">
+    {opt_cards}
+  </div>
+</section>
 
-    <div class="card" style="padding:clamp(24px,4vw,36px);display:flex;flex-direction:column">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <span class="mono" style="font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-muted)">Recommended system</span>
-        <span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--orange);border-radius:999px;padding:6px 13px">Annual match</span>
-      </div>
-      <h2 style="font-weight:700;font-size:30px;margin:0 0 6px">{kwp} kWp system <span style="display:block;margin-top:8px"><span class="mono" style="display:inline-block;background:var(--orange);color:#fff;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-radius:.5rem;padding:5px 12px">{panels} Panels</span></span></h2>
-      <p style="margin:0 0 22px;font-size:15px;color:var(--text-body)">Modeled to produce what you use over a year &mdash; {gen_yr} kWh against {cons_yr} kWh consumed.</p>
-      <ul class="check" style="list-style:none;margin:0 0 24px;padding:0;display:grid;gap:11px;font-size:15px;color:var(--text-body)">
-        {checklist}
-      </ul>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);padding:16px 0;margin-bottom:22px">
-        {stats}
-      </div>
-      <div class="mono" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="10" rx="2"></rect><line x1="22" y1="11" x2="22" y2="13"></line><line x1="6" y1="11" x2="6" y2="13"></line><line x1="10" y1="11" x2="10" y2="13"></line></svg>Add battery storage
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="batbtn sel" data-k="none" onclick="pick('none')"><b>None</b><i>grid-tied only</i></button>
-        <button class="batbtn" data-k="b10" onclick="pick('b10')"><b>+10 kWh</b><i>+{bat10}</i></button>
-        <button class="batbtn" data-k="b15" onclick="pick('b15')"><b>+15 kWh</b><i>+{bat15}</i></button>
-      </div>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 24px;line-height:1.5">Battery options include a hybrid inverter in place of the grid-tied unit. Keeps essential loads running through outages and shifts daytime surplus into the evening.</p>
-      <div style="margin-top:auto">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Total, installed</div>
-        <div id="total" style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:38px;letter-spacing:-.02em;color:var(--price-green)">{price}</div>
-        <div style="font-size:14px;color:var(--ink);font-weight:600;margin-top:2px">&asymp; <span id="total-usd">{price_usd}</span> <span style="font-size:11.5px;color:var(--text-muted);font-weight:400">at G${fx} / US$ (GRA rate, 1 Sep 2026)</span></div>
-        <div id="totalsub" style="font-size:12px;color:var(--text-muted);margin-top:4px">grid-tied, no battery &middot; preliminary, confirmed after site survey</div>
-      </div>
-    </div>
-
+<section class="wrap" style="padding-top:24px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:stretch">
     <div class="card" style="padding:clamp(24px,4vw,36px)">
       <div class="eyebrow">What changes on your bill</div>
       <h2 style="font-weight:700;font-size:28px;margin:0 0 12px">Energy Charges Down. Fixed Charge Stays.</h2>
@@ -246,28 +271,23 @@ HTML = """<!DOCTYPE html>
 
 <section class="wrap" style="padding-top:48px">
   <div class="card" style="padding:clamp(22px,4vw,36px) clamp(22px,4vw,40px)">
-    <div class="eyebrow">Why {panels} panels</div>
+    <div class="eyebrow">Why these sizes</div>
     <h2 style="font-weight:700;font-size:28px;margin:0 0 12px">Sized to Match a Year, Not a Month.</h2>
-    <p style="font-size:15px;line-height:1.65;color:var(--text-body);margin:0 0 26px;max-width:820px">Your bill gives two consumption figures: {bill_kwh} kWh for this cycle and a {avg3} kWh average over the previous three months. Annualised, that's about {cons_yr} kWh. One 450 Wp panel in Georgetown produces roughly {per_panel} kWh a year, so {cons_yr} &divide; {per_panel} &asymp; 33.3 panels &mdash; rounded up to {panels}.</p>
+    <p style="font-size:15px;line-height:1.65;color:var(--text-body);margin:0 0 26px;max-width:820px">Your bill gives two consumption figures: {bill_kwh} kWh for this cycle and a {avg3} kWh average over the previous three months. Annualised, that's about {cons_yr} kWh. One 450 Wp panel in Georgetown produces roughly {per_panel} kWh a year, so {cons_yr} &divide; {per_panel} &asymp; 33.3 panels. Option A rounds that up to {panels}; Option B adds five more so a wet month is covered on its own.</p>
     <div style="overflow-x:auto">{chart}</div>
     <div class="legend">
       <span><span style="width:22px;height:12px;border-radius:3px;background:rgba(9,50,27,.3);display:inline-block"></span>Your consumption (kWh/month)</span>
-      <span><span style="width:22px;height:12px;border-radius:3px;background:#FF6700;display:inline-block"></span>Modeled output of {panels} panels, annual average</span>
-    </div>
-    <div style="overflow-x:auto;margin-top:28px">
-      <table class="sens">
-        <thead><tr><th>Array</th><th>Capacity</th><th>Modeled output</th><th>What it means</th></tr></thead>
-        <tbody>{sens}</tbody>
-      </table>
+      <span><span style="width:22px;height:12px;border-radius:3px;background:#FF6700;display:inline-block"></span>Option A &mdash; {panels} panels, annual average</span>
+      <span><span style="width:22px;height:12px;border-radius:3px;background:#C29848;display:inline-block"></span>Option B &mdash; {panels_b} panels, annual average</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:26px">
       <div style="border-left:3px solid var(--orange);padding-left:16px">
-        <h3 style="font-size:17px;font-weight:700;margin:0 0 6px">Why not more</h3>
-        <p style="font-size:14.5px;line-height:1.65;color:var(--text-body);margin:0">The PVGIS model already deducts 14% for real-world losses. Adding panels on top for soiling or degradation would count those losses twice. Until twelve months of bills or new loads show higher demand, extra capacity is money spent producing energy you can't yet be paid for in full.</p>
+        <h3 style="font-size:17px;font-weight:700;margin:0 0 6px">Option A &mdash; {panels} panels, sized to the year</h3>
+        <p style="font-size:14.5px;line-height:1.65;color:var(--text-body);margin:0">Generates {gen_yr} kWh a year against {cons_yr} kWh consumed &mdash; a {margin}% margin. This bill covers mid-May to mid-June, a lower-yield stretch; GPL's Energy Credits Bank lets a sunny September carry a wet June, so sizing to the year rather than the weakest month avoids paying for capacity that over-produces most of the time. The PVGIS model already deducts 14% for real-world losses, so nothing is double-counted.</p>
       </div>
       <div style="border-left:3px solid var(--gold);padding-left:16px">
-        <h3 style="font-size:17px;font-weight:700;margin:0 0 6px">Why annual, not monthly</h3>
-        <p style="font-size:14.5px;line-height:1.65;color:var(--text-body);margin:0">This bill covers mid-May to mid-June, a lower-yield stretch of the year. GPL's net-billing programme banks surplus energy as credits for approved systems, so a sunny month can carry a cloudy one. Sizing to the year, rather than the weakest month, avoids paying for an array that over-produces most of the time.</p>
+        <h3 style="font-size:17px;font-weight:700;margin:0 0 6px">Option B &mdash; {panels_b} panels, sized to the wettest month</h3>
+        <p style="font-size:14.5px;line-height:1.65;color:var(--text-body);margin:0">Averages {gen_mo_b} kWh a month and still produces around {avg3} kWh in a June-like month, so even the wettest weeks are covered without touching banked credits. Over a year it runs about {surplus_b} kWh ahead of consumption; that surplus accrues in your credits bank and is paid at 90% of tariff if unused after twelve months. The right choice if you expect load to grow, or once GPL confirms your net-billing account and the surplus has a guaranteed value.</p>
       </div>
     </div>
   </div>
@@ -344,16 +364,16 @@ HTML = """<!DOCTYPE html>
 </section>
 
 <script>
-var BASE={price_raw},BAT={{none:0,b10:{bat10_raw},b15:{bat15_raw}}},FX={fx};
+var BASE={{a:{price_raw},b:{price_b_raw}}},BAT={{none:0,b10:{bat10_raw},b15:{bat15_raw}}},FX={fx};
 var SUBS={{none:'grid-tied, no battery \\u00b7 preliminary, confirmed after site survey',
           b10:'incl. 10 kWh battery + hybrid inverter \\u00b7 preliminary, confirmed after site survey',
           b15:'incl. 15 kWh battery + hybrid inverter \\u00b7 preliminary, confirmed after site survey'}};
-function pick(k){{
-  document.querySelectorAll('.batbtn').forEach(function(b){{b.classList.toggle('sel',b.dataset.k===k);}});
-  var g=BASE+BAT[k];
-  document.getElementById('total').textContent='G$'+g.toLocaleString('en-US');
-  document.getElementById('total-usd').textContent='US$'+(Math.round(g/FX/100)*100).toLocaleString('en-US');
-  document.getElementById('totalsub').textContent=SUBS[k];
+function pick(c,k){{
+  document.querySelectorAll('.batbtn[data-card="'+c+'"]').forEach(function(b){{b.classList.toggle('sel',b.dataset.k===k);}});
+  var g=BASE[c]+BAT[k];
+  document.getElementById('total-'+c).textContent='G$'+g.toLocaleString('en-US');
+  document.getElementById('total-usd-'+c).textContent='US$'+(Math.round(g/FX/100)*100).toLocaleString('en-US');
+  document.getElementById('totalsub-'+c).textContent=SUBS[k];
 }}
 </script>
 </body>
@@ -361,20 +381,19 @@ function pick(k){{
 
 html = HTML.format(
     fonts=FONTS, css=CSS,
-    kwp=("%.1f" % KWP), panels=PANELS,
+    kwp=("%.1f" % KWP), panels=PANELS, panels_b=PANELS_B, gen_mo_b=format(GEN_MO_B, ","),
+    surplus_b=format(SURPLUS_B, ","), margin=("%.1f" % MARGIN_PCT),
+    opt_cards="".join(option_card(o) for o in OPTIONS), price_b_raw=PRICE_B,
     gen_yr=format(GEN_YR, ","), cons_yr=format(CONS_YR, ","),
     bill_kwh=format(BILL_KWH, ","), avg3=format(int(round(AVG3_KWH)), ","),
     rate=("%.2f" % RATE), fixed=gfmt(FIXED_MO),
     offset_yr=gfmt(OFFSET_YR), offset_usd=usd(OFFSET_YR),
     yield_kwp=("%.0f" % YIELD_PER_KWP), per_panel=("%.0f" % (PANEL_W / 1000.0 * YIELD_PER_KWP)),
-    price=gfmt(PRICE), price_usd=usd(PRICE), price_raw=PRICE,
+    price_raw=PRICE,
     bat10=gfmt(BAT10), bat15=gfmt(BAT15), bat10_raw=BAT10, bat15_raw=BAT15,
     fx=("%.2f" % FX),
     badges="".join(badge(*b) for b in [("25 yrs", "performance warranty"), ("10 yrs", "product warranty"), ("100%", "annual energy match")]),
-    checklist="".join('<li><span>&#10003;</span><span>%s</span></li>' % c for c in CHECKLIST),
-    stats=stat("~%sk kWh" % ("%.1f" % (GEN_YR / 1000.0)), "modeled yield / year") +
-          stat("~" + gfmt(OFFSET_YR), "energy charges offset / year", "var(--price-green)"),
-    chart=chart_svg(), sens=sens_rows(),
+    chart=chart_svg(),
     sun_tiles="".join(tile(v, l) for v, l in [
         ("5.0 kWh/m&sup2;", "average daily irradiation"),
         ("4.2 &ndash; 5.8", "seasonal range, kWh/m&sup2;/day"),
@@ -396,6 +415,5 @@ if not os.path.isdir(OUT):
 p = OUT + r"\index.html"
 io.open(p, "w", encoding="utf-8", newline="\n").write(html)
 print("index.html  %.1f KB" % (os.path.getsize(p) / 1024.0))
-print("price %s (%s) | +10 kWh %s (%s) | +15 kWh %s (%s) | offset/yr %s (%s)"
-      % (gfmt(PRICE), usd(PRICE), gfmt(PRICE + BAT10), usd(PRICE + BAT10),
-         gfmt(PRICE + BAT15), usd(PRICE + BAT15), gfmt(OFFSET_YR), usd(OFFSET_YR)))
+print("A %s (%s) | B %s (%s) | B gen %d kWh/yr, surplus %d | offset/yr %s"
+      % (gfmt(PRICE), usd(PRICE), gfmt(PRICE_B), usd(PRICE_B), GEN_YR_B, SURPLUS_B, gfmt(OFFSET_YR)))
