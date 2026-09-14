@@ -392,7 +392,7 @@ html = HTML.format(
     price_raw=PRICE,
     bat10=gfmt(BAT10), bat15=gfmt(BAT15), bat10_raw=BAT10, bat15_raw=BAT15,
     fx=("%.2f" % FX),
-    badges="".join(badge(*b) for b in [("25 yrs", "performance warranty"), ("10 yrs", "product warranty")]),
+    badges="".join(badge(*b) for b in [("30 yrs", "performance warranty"), ("10 yrs", "product warranty")]),
     chart=chart_svg(),
     sun_tiles="".join(tile(v, l) for v, l in [
         ("5.0 kWh/m&sup2;", "average daily irradiation"),
@@ -404,7 +404,7 @@ html = HTML.format(
     sun_chart=sun_svg(),
     next_steps="".join('<li><b>%d</b><span>%s</span></li>' % (i + 1, t) for i, t in enumerate(NEXT_STEPS)),
     warranties="".join(warr(v, t) for v, t in [
-        ("25 yrs", "Panel performance warranty &mdash; guaranteed output for a quarter century."),
+        ("30 yrs", "Panel performance warranty &mdash; guaranteed output for three decades."),
         ("10 yrs", "Product warranty on panel materials and workmanship &mdash; defects covered, parts and labour."),
         ("5 yrs", "Comprehensive coverage on the inverter, battery, mounting and workmanship."),
         ("Lifetime", "Support from Solvio's solar engineers &mdash; whenever you need us.")]),
