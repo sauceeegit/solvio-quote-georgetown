@@ -234,7 +234,7 @@ HTML = """<!DOCTYPE html>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:20px 40px;align-items:center;justify-content:space-between;margin-top:22px">
     <p style="font-size:clamp(15px,2vw,17px);line-height:1.6;color:var(--text-body);margin:0;flex:1 1 340px;max-width:560px">Prepared for <strong style="font-weight:600;color:var(--ink)">Moonkally Baburam</strong> &mdash; a {kwp} kWp grid-tied system for your premises at 97 Chandra Nagar, Prashad Nagar, Georgetown, sized to match your annual GPL consumption.</p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:1 1 380px;max-width:520px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;flex:1 1 300px;max-width:360px">
       {badges}
     </div>
   </div>
@@ -392,7 +392,7 @@ html = HTML.format(
     price_raw=PRICE,
     bat10=gfmt(BAT10), bat15=gfmt(BAT15), bat10_raw=BAT10, bat15_raw=BAT15,
     fx=("%.2f" % FX),
-    badges="".join(badge(*b) for b in [("25 yrs", "performance warranty"), ("10 yrs", "product warranty"), ("100%", "annual energy match")]),
+    badges="".join(badge(*b) for b in [("25 yrs", "performance warranty"), ("10 yrs", "product warranty")]),
     chart=chart_svg(),
     sun_tiles="".join(tile(v, l) for v, l in [
         ("5.0 kWh/m&sup2;", "average daily irradiation"),
