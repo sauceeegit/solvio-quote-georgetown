@@ -148,8 +148,9 @@ def checklist(n, kwp, inv):
 
 def option_card(o):
     checks = "".join('<li><span>&#10003;</span><span>%s</span></li>' % c for c in o["checks"])
-    stats = stat("~%sk kWh" % ("%.1f" % (o["gen"] / 1000.0)), "modeled yield / year") + \
-            stat("~" + gfmt(OFFSET_YR), "energy charges offset / year", "var(--price-green)") + \
+    # short values so three stats fit one row on a 375px phone without wrapping
+    stats = stat("~%.1fk" % (o["gen"] / 1000.0), "kWh modeled / year") + \
+            stat("~G$%.2fM" % (OFFSET_YR / 1e6), "energy charges offset / year", "var(--price-green)") + \
             ('<div><div id="pay-%s" style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:19px;color:var(--ink)">~%.1f yrs</div>'
              '<div style="font-size:12px;color:var(--text-muted)">payback</div></div>' % (o["key"], o["price"] / float(OFFSET_YR)))
     chip = ('<span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--orange);border-radius:999px;padding:6px 13px">%s</span>' % o["chip"]
