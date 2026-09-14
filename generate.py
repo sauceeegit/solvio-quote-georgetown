@@ -149,7 +149,9 @@ def checklist(n, kwp, inv):
 def option_card(o):
     checks = "".join('<li><span>&#10003;</span><span>%s</span></li>' % c for c in o["checks"])
     stats = stat("~%sk kWh" % ("%.1f" % (o["gen"] / 1000.0)), "modeled yield / year") + \
-            stat("~" + gfmt(OFFSET_YR), "energy charges offset / year", "var(--price-green)")
+            stat("~" + gfmt(OFFSET_YR), "energy charges offset / year", "var(--price-green)") + \
+            ('<div><div id="pay-%s" style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:19px;color:var(--ink)">~%.1f yrs</div>'
+             '<div style="font-size:12px;color:var(--text-muted)">payback</div></div>' % (o["key"], o["price"] / float(OFFSET_YR)))
     chip = ('<span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--orange);border-radius:999px;padding:6px 13px">%s</span>' % o["chip"]
             if o["solid"] else
             '<span class="mono" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-body);border:1px solid var(--border-soft);border-radius:999px;padding:5px 12px">%s</span>' % o["chip"])
@@ -165,7 +167,7 @@ def option_card(o):
       <ul class="check" style="list-style:none;margin:0 0 24px;padding:0;display:grid;gap:11px;font-size:15px;color:var(--text-body)">
         %(checks)s
       </ul>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);padding:16px 0;margin-bottom:%(stats_mb)s">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);padding:16px 0;margin-bottom:%(stats_mb)s">
         %(stats)s
       </div>%(note)s
       <div class="mono" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px">
@@ -360,7 +362,7 @@ HTML = """<!DOCTYPE html>
 </section>
 
 <script>
-var BASE={{a:{price_raw},b:{price_b_raw}}},BAT={{none:0,b10:{bat10_raw},b15:{bat15_raw}}},FX={fx};
+var BASE={{a:{price_raw},b:{price_b_raw}}},BAT={{none:0,b10:{bat10_raw},b15:{bat15_raw}}},FX={fx},OFFSET={offset_raw};
 var SUBS={{none:'grid-tied, no battery \\u00b7 preliminary, confirmed after site survey',
           b10:'incl. 10 kWh battery + hybrid inverter \\u00b7 preliminary, confirmed after site survey',
           b15:'incl. 15 kWh battery + hybrid inverter \\u00b7 preliminary, confirmed after site survey'}};
@@ -370,6 +372,7 @@ function pick(c,k){{
   document.getElementById('total-'+c).textContent='G$'+g.toLocaleString('en-US');
   document.getElementById('total-usd-'+c).textContent='US$'+(Math.round(g/FX/100)*100).toLocaleString('en-US');
   document.getElementById('totalsub-'+c).textContent=SUBS[k];
+  document.getElementById('pay-'+c).textContent='~'+(g/OFFSET).toFixed(1)+' yrs';
 }}
 </script>
 </body>
@@ -379,7 +382,7 @@ html = HTML.format(
     fonts=FONTS, css=CSS,
     kwp=("%.1f" % KWP), panels=PANELS, panels_b=PANELS_B, gen_mo_b=format(GEN_MO_B, ","),
     surplus_b=format(SURPLUS_B, ","), margin=("%.1f" % MARGIN_PCT),
-    opt_cards="".join(option_card(o) for o in OPTIONS), price_b_raw=PRICE_B,
+    opt_cards="".join(option_card(o) for o in OPTIONS), price_b_raw=PRICE_B, offset_raw=OFFSET_YR,
     gen_yr=format(GEN_YR, ","), cons_yr=format(CONS_YR, ","),
     bill_kwh=format(BILL_KWH, ","), avg3=format(int(round(AVG3_KWH)), ","),
     rate=("%.2f" % RATE), fixed=gfmt(FIXED_MO),
