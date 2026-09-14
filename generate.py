@@ -230,7 +230,7 @@ HTML = """<!DOCTYPE html>
     <h1 style="font-weight:800;font-size:clamp(30px,6.5vw,52px);line-height:1.1;margin:0;color:#fff;max-width:760px">Solar for Your Business. Sized to Your GPL Bill.</h1>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:20px 40px;align-items:center;justify-content:space-between;margin-top:22px">
-    <p style="font-size:clamp(15px,2vw,17px);line-height:1.6;color:var(--text-body);margin:0;flex:1 1 340px;max-width:560px">Prepared for <strong style="font-weight:600;color:var(--ink)">Moonkally Baburam</strong> &mdash; a {kwp} kWp grid-tied system for your premises in Prashad Nagar, Georgetown, sized to match your annual GPL consumption.</p>
+    <p style="font-size:clamp(15px,2vw,17px);line-height:1.6;color:var(--text-body);margin:0;flex:1 1 340px;max-width:560px">Prepared for <strong style="font-weight:600;color:var(--ink)">Moonkally Baburam</strong> &mdash; a {kwp} kWp grid-tied system for your premises at 97 Chandra Nagar, Prashad Nagar, Georgetown, sized to match your annual GPL consumption.</p>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:1 1 380px;max-width:520px">
       {badges}
     </div>
